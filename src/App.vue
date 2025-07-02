@@ -29,10 +29,11 @@
                   dense
                   hide-details
                   @keyup.enter="addTask"
+                  :disabled="loading"
                 ></v-text-field>
               </v-col>
               <v-col cols="3">
-                <v-btn color="primary" @click="addTask" block>
+                <v-btn color="primary" @click="addTask" block :disabled="loading">
                   追加
                 </v-btn>
               </v-col>
@@ -65,6 +66,7 @@
                 </template>
               </v-list-item>
             </v-list>
+
             <v-card-actions v-if="!loading && tasks.length === 0">
               <v-spacer></v-spacer>
               <p class="text--disabled">ToDo がありません</p>
@@ -101,6 +103,7 @@ export default {
   data: () => ({
     newTask: '', // 新しいToDoの入力値を保持
     tasks: [], // ToDoリストのタスク
+    selected: [], 
     loading: false, // API呼び出し中のローディング状態を管理
     error: null,    // API呼び出し時のエラーメッセージを保持
   }),
@@ -120,12 +123,12 @@ export default {
         const fetchedTasks = Object.keys(response.data).map(id => {
           const taskData = response.data[id];
           return {
-            id: id, // バックエンドからのIDを保持
-            text: taskData.task_text, // task_textをtextにマッピング
-            done: taskData.completed  // completedをdoneにマッピング
+            id: id,
+            text: taskData.task_text,
+            done: taskData.completed 
           };
         });
-        this.tasks = fetchedTasks; // 変換したデータでtasksを更新
+        this.tasks = fetchedTasks;
       } catch (err) {
         console.error("ToDoデータの取得に失敗しました:", err);
         this.error = "ToDoデータの取得に失敗しました。サーバーが起動しているか確認してください。";
@@ -134,26 +137,38 @@ export default {
       }
     },
     // 新しいToDoを追加するメソッド
-    addTask() {
-      if (this.newTask.trim() === '') return;
-      this.tasks.unshift({
-        // 新しいタスクには一時的なIDを付与
-        id: Date.now().toString(),
-        text: this.newTask,
-        done: false,
-      });
-      this.newTask = ''; // 入力フィールドをクリア
+    async addTask() { 
+      if (this.newTask.trim() === '') return; // 入力が空の場合は何もしない
+
+      this.loading = true; // ローディング開始
+      this.error = null;   // エラーをリセット
+
+      try {
+        // Todoリストにタスク追加
+        const response = await axios.post('http://localhost:5000/settask', [{ text: this.newTask }]);
+
+        if (response.status === 201) {
+          this.newTask = ''; // 入力フィールドをクリア
+          await this.fetchTasks(); // タスクリストを再取得して最新の状態を反映
+        } else {
+          this.error = "タスクの追加に失敗しました。";
+          console.error("タスク追加APIからの予期せぬレスポンス:", response.status);
+        }
+      } catch (err) {
+        console.error("タスクの追加に失敗しました:", err);
+        this.error = "タスクの追加に失敗しました。ネットワーク接続またはサーバーを確認してください。";
+      } finally {
+        this.loading = false; // ローディング終了
+      }
     },
     // ToDoの完了状態を切り替えるメソッド
     toggleDone(task) {
-      task.done = !task.done; // taskオブジェクトのdoneプロパティを反転
-    
+      task.done = !task.done;
     },
     // ToDoを削除するメソッド
     deleteTask(idToDelete) {
       // 削除したいIDを持つタスクを除外して新しい配列を作成
       this.tasks = this.tasks.filter(task => task.id !== idToDelete);
-    
     },
   },
 };
