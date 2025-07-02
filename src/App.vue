@@ -166,9 +166,29 @@ export default {
       task.done = !task.done;
     },
     // ToDoを削除するメソッド
-    deleteTask(idToDelete) {
-      // 削除したいIDを持つタスクを除外して新しい配列を作成
-      this.tasks = this.tasks.filter(task => task.id !== idToDelete);
+    async deleteTask(idToDelete) {
+      this.loading = true; // ローディング開始
+      this.error = null;   // エラーをリセット
+
+      try {
+        // タスクを削除するAPI
+        const response = await axios.post('http://localhost:5000/deletetask', [{ id: idToDelete }]);
+
+        if (response.status === 204) {
+          await this.fetchTasks(); // タスクリストを再取得して最新の状態を反映
+        } else if (response.status === 404) {
+          this.error = "削除対象のタスクが見つかりませんでした。";
+          console.error("タスク削除API: タスクが見つかりません。", idToDelete);
+        } else {
+          this.error = "タスクの削除に失敗しました。";
+          console.error("タスク削除APIからの予期せぬレスポンス:", response.status);
+        }
+      } catch (err) {
+        console.error("タスクの削除に失敗しました:", err);
+        this.error = "タスクの削除に失敗しました。ネットワーク接続またはサーバーを確認してください。";
+      } finally {
+        this.loading = false; // ローディング終了
+      }
     },
   },
 };
